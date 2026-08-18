@@ -1,0 +1,5 @@
+fitness-tracker-spec.md
+.env
+*.local.json
+node_modules/
+.DS_Store
