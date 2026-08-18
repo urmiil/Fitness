@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "weightUnit": "lb",
+  "liftUnit": "lb",
+  "targets": {
+    "calories": 2400,
+    "protein": 180,
+    "carbs": 240,
+    "fat": 70
+  }
+}

@@ -1,0 +1,223 @@
+:root {
+  --bg: #12161c;
+  --surface: #1a2029;
+  --surface-2: #212836;
+  --border: #2a3242;
+  --text: #e9edf3;
+  --text-dim: #8c98ab;
+  --accent: #4fd1c0;
+  --accent-text: #06201c;
+  --danger: #e2685c;
+  --radius: 10px;
+  --tap: 48px;
+  font-size: 16px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.num, input[type="number"], .tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.app-shell {
+  max-width: 640px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 10;
+}
+
+.brand {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+.tabs a {
+  color: var(--text-dim);
+  text-decoration: none;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius);
+  min-height: var(--tap);
+  display: inline-flex;
+  align-items: center;
+}
+
+.tabs a.active {
+  color: var(--text);
+  background: var(--surface);
+}
+
+.tabs a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sync-badge {
+  min-width: var(--tap);
+  min-height: 2.25rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-dim);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sync-badge.pending {
+  color: var(--accent-text);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.view {
+  flex: 1;
+  padding: 1.25rem 1rem 3rem;
+}
+
+h1 {
+  font-size: 1.25rem;
+  margin: 0 0 1rem;
+}
+
+h2 {
+  font-size: 0.95rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 1.75rem 0 0.75rem;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.9rem;
+}
+
+.field label {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.field-row {
+  display: flex;
+  gap: 0.75rem;
+}
+.field-row .field { flex: 1; }
+
+input, select {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 0.65rem 0.75rem;
+  min-height: var(--tap);
+  font-size: 1rem;
+  width: 100%;
+}
+
+button.btn {
+  min-height: var(--tap);
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+button.btn.danger {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: transparent;
+}
+
+.btn-row {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.status-line {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+}
+.status-line.ok { color: var(--accent); }
+.status-line.err { color: var(--danger); }
+.status-line.pending { color: var(--text-dim); }
+
+.hint {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin: 0.25rem 0 0;
+}
+
+.empty-state {
+  color: var(--text-dim);
+  text-align: center;
+  padding: 3rem 1rem;
+}
+
+.empty-state a {
+  color: var(--accent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .view { transition: opacity 120ms ease; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+
+@media (max-width: 420px) {
+  .field-row { flex-direction: column; }
+}
