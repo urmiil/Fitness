@@ -3,8 +3,8 @@
 A single-user fitness tracker. Static site, no backend — data lives as JSON in
 this repo and is read/written through the GitHub API straight from the browser.
 
-**Status: Phase 2 of 6.** Weight logging works end to end. Nutrition and
-workouts are not built yet.
+**Status: Phase 3 of 6.** Weight and nutrition logging work end to end.
+Workouts are not built yet.
 
 ---
 
@@ -69,19 +69,24 @@ password manager will offer to save it for the eventual re-entry.
 - **Log a weigh-in:** Weight tab → the date defaults to today and the value
   prefills from your last entry, so most days it's two stepper taps and Save.
   Picking a date that already has an entry switches the form to editing it.
+- **Log food:** Food tab → pick the meal (it guesses from the clock), then tap
+  a chip in the Recent row to add that food again in one tap. The row holds
+  the last 20 distinct foods you've eaten, newest first. Anything new goes in
+  the form below; the pencil on a chip loads it into the form so you can
+  change the portion first. Daily totals are computed, never stored.
 - **Everything saves locally first, instantly.** The badge in the header
   counts unsynced files — press it to push them to GitHub. Each sync is a
   commit, so your git history doubles as an audit log.
 - **Two machines:** log freely on both, even if you forget to sync. Syncing
   merges by entry (newest edit wins, deletes stick) instead of overwriting.
-- **Dashboard** shows current weight, 7-day change, and whether today is
-  logged.
+- **Dashboard** shows current weight with a 30-day trend line, the 7-day
+  change, and today's calories and macros against your targets.
 - **Units** (lb/kg) and calorie/macro targets live in Settings and sync
   through the repo.
 
-Not built yet: nutrition (Phase 3), workouts (Phase 4), history and charts
-(Phase 5), auto-sync polish (Phase 6). The full spec is in the local
-`fitness-tracker-spec.md`, deliberately gitignored — this repo is public.
+Not built yet: workouts (Phase 4), history and charts (Phase 5), auto-sync
+polish (Phase 6). The full spec is in the local `fitness-tracker-spec.md`,
+deliberately gitignored — this repo is public.
 
 ---
 
@@ -132,7 +137,8 @@ narrowly-scoped PAT in a dedicated origin is the sound design.
 
 ```
 index.html          app shell + router mount
-style.css           dark theme, tabular figures, 48px touch targets
+style.css           dark theme, tabular figures, 48px touch targets,
+                    all motion behind prefers-reduced-motion
 serve.ps1           static file server for Windows (dedicated port 47613)
 src/
   app.js            hash router, sync button, background refresh
@@ -142,11 +148,15 @@ src/
   store.js          localStorage cache + dirty set + subscribe/notify
   sync.js           push dirty files, pull remote months
   weight.js         weight domain logic (upsert, tombstone, stats, units)
+  nutrition.js      food domain logic (per-day entries, totals, recent foods)
+  settings.js       units + targets, with defaults filled in
   manifest.js       month-file index handling
   dates.js          local-time date helpers (never toISOString for "today")
-  dom.js            esc() XSS boundary + toast
+  dom.js            esc() XSS boundary + toast + int() numeric coercion
   id.js             sortable collision-resistant IDs
-  screens/          dashboard.js, weight.js, settings.js
+  anim.js           counters and previous-value memory for animations
+  screens/          dashboard.js, weight.js, food.js, settings.js
+                    nutrition-summary.js, sparkline.js (shared fragments)
 data/
   manifest.json     index of which month files exist
   settings.json     units + targets (synced, no secrets)

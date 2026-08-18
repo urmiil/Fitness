@@ -1,5 +1,6 @@
 import { esc } from "../dom.js";
-import { subscribe, getCached, dirtyCount } from "../store.js";
+import { subscribe, dirtyCount } from "../store.js";
+import { weightUnit } from "../settings.js";
 import { todayLocalISO } from "../dates.js";
 import {
   upsertWeight,
@@ -10,17 +11,13 @@ import {
   round1,
 } from "../weight.js";
 
-function displayUnit() {
-  return getCached("data/settings.json")?.weightUnit || "lb";
-}
-
 export function renderWeight(root) {
-  const unit = displayUnit();
+  const unit = weightUnit();
   const today = todayLocalISO();
 
   root.innerHTML = `
     <h1>Weight</h1>
-    <div class="card">
+    <div class="card rise" style="--rise-i:0">
       <div class="field">
         <label for="w-date">Date</label>
         <input id="w-date" type="date" value="${today}" max="${today}" />

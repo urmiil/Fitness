@@ -1,8 +1,9 @@
 import { renderDashboard } from "./screens/dashboard.js";
 import { renderWeight } from "./screens/weight.js";
+import { renderFood } from "./screens/food.js";
 import { renderSettings } from "./screens/settings.js";
 import { dirtyCount, subscribe } from "./store.js";
-import { syncAll, refreshWeightMonths, refreshSettings } from "./sync.js";
+import { syncAll, refreshWeightMonths, refreshNutritionMonths, refreshSettings } from "./sync.js";
 import { todayLocalISO, monthOf, prevMonthOf } from "./dates.js";
 import { showToast } from "./dom.js";
 
@@ -12,6 +13,7 @@ const syncBadge = document.getElementById("sync-badge");
 const routes = {
   "/": renderDashboard,
   "/weight": renderWeight,
+  "/food": renderFood,
   "/settings": renderSettings,
 };
 
@@ -44,6 +46,11 @@ function route() {
   updateActiveTab(path);
   view.innerHTML = "";
   cleanup = routes[path](view) || null;
+  // Restart the entrance animation: the element persists across routes, so
+  // the class has to be removed and re-added around a forced reflow.
+  view.classList.remove("route-in");
+  void view.offsetWidth;
+  view.classList.add("route-in");
 }
 
 syncBadge.addEventListener("click", async () => {
@@ -63,9 +70,13 @@ subscribe((path) => {
 route();
 updateSyncBadge();
 
-// Background pull: settings, plus the current and previous weight months, so
-// entries logged on the other machine appear shortly after load. Screens
-// re-render themselves via store subscriptions when anything changes.
-const thisMonth = monthOf(todayLocalISO());
+// Background pull: settings, plus the current and previous month for each
+// domain, so entries logged on the other machine appear shortly after load.
+// The previous month matters for more than the 1st: the food screen's recent
+// list reaches back across the month boundary. Screens re-render themselves
+// via store subscriptions when anything changes.
+const months = [monthOf(todayLocalISO())];
+months.push(prevMonthOf(months[0]));
 refreshSettings();
-refreshWeightMonths([thisMonth, prevMonthOf(thisMonth)]);
+refreshWeightMonths(months);
+refreshNutritionMonths(months);

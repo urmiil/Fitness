@@ -1,16 +1,25 @@
 // Sync orchestration: push everything in the dirty set, pull remote months
 // into the cache. The merge always runs inside writeFile's GET-merge-PUT, so
-// a two-machine divergence reconciles instead of overwriting (spec §5).
+// a two-machine divergence reconciles instead of overwriting (spec section 5).
 
 import { getDirtySet, getCached, setCached, clearDirty } from "./store.js";
 import { writeFile, readFile, hasToken } from "./github.js";
 import { mergeWeightFile, weightPath } from "./weight.js";
+import { mergeNutritionFile, nutritionPath } from "./nutrition.js";
 import { MANIFEST_PATH, mergeManifest } from "./manifest.js";
+import { SETTINGS_PATH } from "./settings.js";
 
-const SETTINGS_PATH = "data/settings.json";
+// Every month-file domain: where its files live and how two copies reconcile.
+// Workouts join this table in Phase 4.
+const DOMAINS = {
+  weight: { path: weightPath, merge: mergeWeightFile },
+  nutrition: { path: nutritionPath, merge: mergeNutritionFile },
+};
 
 function transformFor(path, local) {
-  if (path.startsWith("data/weight/")) return (remote) => mergeWeightFile(remote, local);
+  for (const [domain, { merge }] of Object.entries(DOMAINS)) {
+    if (path.startsWith(`data/${domain}/`)) return (remote) => merge(remote, local);
+  }
   if (path === MANIFEST_PATH) return (remote) => mergeManifest(remote, local);
   return () => local; // settings.json: scalar prefs, last write wins
 }
@@ -43,23 +52,27 @@ export async function syncAll() {
 }
 
 /**
- * Pull weight months into the cache, merging rather than replacing so local
- * unsynced edits (and tombstones) survive. No-ops silently when offline.
+ * Pull a domain's month files into the cache, merging rather than replacing so
+ * local unsynced edits (and tombstones) survive. No-ops silently when offline.
  */
-export async function refreshWeightMonths(months) {
+async function refreshMonths(domain, months) {
+  const { path, merge } = DOMAINS[domain];
   for (const ym of months) {
-    const path = weightPath(ym);
+    const file = path(ym);
     try {
-      const remote = await readFile(path);
+      const remote = await readFile(file);
       if (!remote) continue;
-      const local = getCached(path);
-      const merged = local ? mergeWeightFile(remote, local) : remote;
-      if (JSON.stringify(merged) !== JSON.stringify(local)) setCached(path, merged);
+      const local = getCached(file);
+      const merged = local ? merge(remote, local) : remote;
+      if (JSON.stringify(merged) !== JSON.stringify(local)) setCached(file, merged);
     } catch {
       // Offline or unreachable — the cache stands.
     }
   }
 }
+
+export const refreshWeightMonths = (months) => refreshMonths("weight", months);
+export const refreshNutritionMonths = (months) => refreshMonths("nutrition", months);
 
 /** Pull settings unless a local edit is waiting to be pushed. */
 export async function refreshSettings() {

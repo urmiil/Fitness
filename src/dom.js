@@ -21,3 +21,11 @@ export function showToast(message, kind = "info") {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove("show"), 3500);
 }
+
+// Coerce a stored value to a finite integer before interpolating it into
+// markup. Numbers don't need esc() — but only once they're provably numbers.
+// Month files are hand-editable, so a "calories" field could hold anything.
+export function int(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.round(n) : 0;
+}

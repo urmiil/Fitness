@@ -8,17 +8,9 @@ import {
   readFile,
   writeFile,
 } from "../github.js";
-import { getCached, setCached, markDirty, clearDirty, getDirtySet } from "../store.js";
+import { setCached, markDirty, clearDirty, getDirtySet } from "../store.js";
+import { SETTINGS_PATH, getSettings } from "../settings.js";
 import { esc } from "../dom.js";
-
-const SETTINGS_PATH = "data/settings.json";
-
-const DEFAULT_SETTINGS = {
-  schemaVersion: 1,
-  weightUnit: "lb",
-  liftUnit: "lb",
-  targets: { calories: 2400, protein: 180, carbs: 240, fat: 70 },
-};
 
 function maskToken(token) {
   if (!token) return "";
@@ -29,13 +21,13 @@ function maskToken(token) {
 export function renderSettings(root) {
   const config = getConfig();
   const token = getToken();
-  const settings = getCached(SETTINGS_PATH) || DEFAULT_SETTINGS;
+  const settings = getSettings();
 
   root.innerHTML = `
     <h1>Settings</h1>
 
     <h2>GitHub connection</h2>
-    <div class="card">
+    <div class="card rise" style="--rise-i:0">
       <div class="field-row">
         <div class="field">
           <label for="owner">Owner</label>
@@ -72,7 +64,7 @@ export function renderSettings(root) {
     </div>
 
     <h2>Units &amp; targets</h2>
-    <div class="card">
+    <div class="card rise" style="--rise-i:1">
       <div class="field-row">
         <div class="field">
           <label for="weightUnit">Bodyweight unit</label>
@@ -118,7 +110,7 @@ export function renderSettings(root) {
   `;
 
   wireConnectionCard(root);
-  wireSettingsCard(root, settings);
+  wireSettingsCard(root);
   refreshSettingsFromRemote(root);
 }
 
@@ -153,7 +145,7 @@ function wireConnectionCard(root) {
   });
 }
 
-function wireSettingsCard(root, initial) {
+function wireSettingsCard(root) {
   const status = root.querySelector("#settings-status");
 
   root.querySelector("#save-settings").addEventListener("click", async () => {
@@ -217,12 +209,15 @@ async function refreshSettingsFromRemote(root) {
     const remote = await readFile(SETTINGS_PATH);
     if (!remote) return;
     setCached(SETTINGS_PATH, remote);
-    root.querySelector("#weightUnit").value = remote.weightUnit;
-    root.querySelector("#liftUnit").value = remote.liftUnit;
-    root.querySelector("#calories").value = remote.targets.calories;
-    root.querySelector("#protein").value = remote.targets.protein;
-    root.querySelector("#carbs").value = remote.targets.carbs;
-    root.querySelector("#fat").value = remote.targets.fat;
+    // Read back through getSettings so a hand-edited file missing a key still
+    // fills every input.
+    const s = getSettings();
+    root.querySelector("#weightUnit").value = s.weightUnit;
+    root.querySelector("#liftUnit").value = s.liftUnit;
+    root.querySelector("#calories").value = s.targets.calories;
+    root.querySelector("#protein").value = s.targets.protein;
+    root.querySelector("#carbs").value = s.targets.carbs;
+    root.querySelector("#fat").value = s.targets.fat;
   } catch {
     // Offline or unreachable — cached/default values already rendered.
   }
