@@ -155,7 +155,7 @@ input, select {
   width: 100%;
 }
 
-button.btn {
+.btn {
   min-height: var(--tap);
   padding: 0.6rem 1rem;
   border-radius: var(--radius);
@@ -167,13 +167,13 @@ button.btn {
   cursor: pointer;
 }
 
-button.btn.primary {
+.btn.primary {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-text);
 }
 
-button.btn.danger {
+.btn.danger {
   color: var(--danger);
   border-color: var(--danger);
   background: transparent;
@@ -206,9 +206,180 @@ button.btn.danger {
   padding: 3rem 1rem;
 }
 
-.empty-state a {
+.empty-state a,
+.hint a {
   color: var(--accent);
 }
+
+.dim {
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+.card h2.card-title {
+  margin: 0 0 0.75rem;
+}
+
+/* Weight logger */
+.stepper-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: stretch;
+}
+
+.stepper-row input {
+  text-align: center;
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
+.btn.stepper {
+  min-width: var(--tap);
+  font-size: 1.3rem;
+  flex: 0 0 auto;
+}
+
+/* Entry list */
+.entry-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.25rem;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.entry-date {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  min-width: 6.4rem;
+}
+
+.entry-main {
+  font-weight: 600;
+}
+
+.delta {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  min-width: 2.8rem;
+}
+
+.entry-note {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  flex-basis: 100%;
+  padding-left: 7.15rem;
+}
+
+.entry-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.4rem;
+}
+
+.btn.small {
+  min-height: 44px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.btn.small.danger {
+  color: var(--danger);
+  background: transparent;
+}
+
+/* Anchor styled as a button (dashboard quick actions) */
+.btn-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  min-height: var(--tap);
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+a.btn.primary {
+  color: var(--accent-text);
+}
+
+/* Dashboard stats */
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 0.25rem 0 0.75rem;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stat-value {
+  font-size: 1.9rem;
+  font-weight: 700;
+}
+
+.stat-unit {
+  font-size: 1rem;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.stat-sub {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.stat-today {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  margin: 0.25rem 0 0;
+}
+
+/* Accent means "done / target met" and nothing else */
+.stat-today.done {
+  color: var(--accent);
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1.25rem;
+  transform: translateX(-50%) translateY(0.75rem);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease, transform 150ms ease;
+  max-width: min(90vw, 32rem);
+  z-index: 20;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.toast[data-kind="err"] { border-color: var(--danger); }
+.toast[data-kind="ok"] { border-color: var(--accent); }
 
 @media (prefers-reduced-motion: no-preference) {
   .view { transition: opacity 120ms ease; }

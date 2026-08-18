@@ -12,6 +12,7 @@
       <span class="brand">Fitness</span>
       <nav class="tabs" aria-label="Primary">
         <a href="#/" data-route="/">Dashboard</a>
+        <a href="#/weight" data-route="/weight">Weight</a>
         <a href="#/settings" data-route="/settings">Settings</a>
       </nav>
       <button id="sync-badge" class="sync-badge" type="button" title="Pending changes">0</button>
@@ -19,6 +20,8 @@
 
     <main id="view" class="view" aria-live="polite"></main>
   </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script type="module" src="src/app.js"></script>
 </body>
