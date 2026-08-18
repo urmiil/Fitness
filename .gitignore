@@ -1,4 +1,7 @@
+# Claude-facing working notes, not app content. Repo is public.
 fitness-tracker-spec.md
+HANDOFF.md
+
 .env
 *.local.json
 node_modules/
