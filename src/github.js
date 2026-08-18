@@ -1,12 +1,20 @@
 // Data layer: all GitHub reads/writes go through this module. Rendering code
 // must never call fetch directly (see spec section 7).
 //
-// Read strategy is swappable per repo visibility:
-//   - "public"  -> unauthenticated raw.githubusercontent.com (fast, doesn't
-//                  count against the API rate limit)
-//   - "private" -> authenticated Contents API (raw.githubusercontent.com
-//                  won't serve private files without auth either way)
+// Read strategy:
+//   - token present -> authenticated Contents API. API reads are
+//     read-your-writes consistent; raw.githubusercontent.com sits behind a
+//     ~5-minute CDN cache, so raw reads right after a sync would make
+//     just-saved data appear to revert.
+//   - no token, public repo -> raw.githubusercontent.com (fast, uncounted),
+//     falling back to the unauthenticated Contents API (60 req/hr) on error.
+//     Note raw also negative-caches 404s for ~5 min, so tokenless reads of a
+//     brand-new file can lag; browse-only mode is best-effort by design.
 // Writes always go through the authenticated Contents API.
+//
+// Security invariant: the token is attached by apiFetch() and nowhere else,
+// and apiFetch refuses any URL outside https://api.github.com. Keep it that
+// way — it is what makes the localStorage token tolerable.
 
 import { utf8ToBase64, base64ToUtf8 } from "./base64.js";
 
@@ -47,6 +55,8 @@ export function hasToken() {
   return Boolean(getToken());
 }
 
+const API_ORIGIN = "https://api.github.com";
+
 function authHeaders(extra = {}) {
   const token = getToken();
   return {
@@ -56,9 +66,20 @@ function authHeaders(extra = {}) {
   };
 }
 
-function contentsUrl(path) {
-  const { owner, repo } = getConfig();
-  return `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+// The only place the token is attached to a request. Hard-refuses any
+// destination other than the GitHub API so a future bug can't leak it.
+function apiFetch(url, opts = {}) {
+  if (!url.startsWith(API_ORIGIN + "/")) {
+    throw new Error(`Refusing to send credentials to non-API URL: ${url}`);
+  }
+  return fetch(url, { ...opts, headers: authHeaders(opts.headers || {}) });
+}
+
+function contentsUrl(path, { withRef = false } = {}) {
+  const { owner, repo, branch } = getConfig();
+  const base = `${API_ORIGIN}/repos/${owner}/${repo}/contents/${path}`;
+  // GETs need ?ref= to honor a non-default branch; PUTs name it in the body.
+  return withRef ? `${base}?ref=${encodeURIComponent(branch)}` : base;
 }
 
 function rawUrl(path) {
@@ -71,9 +92,7 @@ export async function testConnection() {
   const { owner, repo } = getConfig();
   if (!owner || !repo) return { ok: false, status: 0, message: "Owner/repo not set" };
   try {
-    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
-      headers: authHeaders(),
-    });
+    const res = await apiFetch(`${API_ORIGIN}/repos/${owner}/${repo}`);
     if (res.status === 401 || res.status === 403) {
       return { ok: false, status: res.status, message: "Token rejected or insufficient permissions" };
     }
@@ -93,7 +112,7 @@ export async function testConnection() {
  * Returns { sha: undefined, data: null } if the file doesn't exist yet.
  */
 async function getFileWithSha(path) {
-  const res = await fetch(contentsUrl(path), { headers: authHeaders() });
+  const res = await apiFetch(contentsUrl(path, { withRef: true }));
   if (res.status === 404) return { sha: undefined, data: null };
   if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`);
   const file = await res.json();
@@ -103,23 +122,29 @@ async function getFileWithSha(path) {
 
 /**
  * Read a JSON file. Returns parsed data, or null if the file doesn't exist.
- * Uses the fast unauthenticated path for public repos, falls back to the
- * authenticated Contents API for private repos or when raw access fails.
+ * Prefers the consistent authenticated API whenever a token exists; the raw
+ * CDN is only used for tokenless browsing of a public repo (see header note).
  */
 export async function readFile(path) {
-  const { visibility } = getConfig();
+  if (hasToken()) {
+    const { data } = await getFileWithSha(path);
+    return data;
+  }
 
+  const { visibility } = getConfig();
   if (visibility === "public") {
     try {
       const res = await fetch(rawUrl(path), { cache: "no-store" });
       if (res.status === 404) return null;
       if (res.ok) return await res.json();
-      // Fall through to authenticated path on unexpected errors.
+      // Unexpected status — fall through to the unauthenticated API.
     } catch {
       // Network error on raw host — fall through.
     }
   }
 
+  // Unauthenticated Contents API: works for public repos (60 req/hr cap),
+  // 404s for private ones, which surfaces as the read-only empty state.
   const { data } = await getFileWithSha(path);
   return data;
 }
@@ -146,9 +171,9 @@ export async function writeFile(path, transform, message) {
       branch: getConfig().branch,
       ...(sha ? { sha } : {}),
     };
-    const res = await fetch(contentsUrl(path), {
+    const res = await apiFetch(contentsUrl(path), {
       method: "PUT",
-      headers: authHeaders({ "Content-Type": "application/json" }),
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     if (res.ok) return merged;

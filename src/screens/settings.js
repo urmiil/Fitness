@@ -8,7 +8,8 @@ import {
   readFile,
   writeFile,
 } from "../github.js";
-import { getCached, setCached, markDirty, clearDirty } from "../store.js";
+import { getCached, setCached, markDirty, clearDirty, getDirtySet } from "../store.js";
+import { esc } from "../dom.js";
 
 const SETTINGS_PATH = "data/settings.json";
 
@@ -38,17 +39,17 @@ export function renderSettings(root) {
       <div class="field-row">
         <div class="field">
           <label for="owner">Owner</label>
-          <input id="owner" value="${config.owner}" placeholder="urmiil" />
+          <input id="owner" value="${esc(config.owner)}" placeholder="urmiil" />
         </div>
         <div class="field">
           <label for="repo">Repo</label>
-          <input id="repo" value="${config.repo}" placeholder="Fitness" />
+          <input id="repo" value="${esc(config.repo)}" placeholder="Fitness" />
         </div>
       </div>
       <div class="field-row">
         <div class="field">
           <label for="branch">Branch</label>
-          <input id="branch" value="${config.branch}" placeholder="main" />
+          <input id="branch" value="${esc(config.branch)}" placeholder="main" />
         </div>
         <div class="field">
           <label for="visibility">Repo visibility</label>
@@ -60,8 +61,8 @@ export function renderSettings(root) {
       </div>
       <div class="field">
         <label for="token">Personal access token</label>
-        <input id="token" type="password" placeholder="${token ? maskToken(token) : "github_pat_..."}" autocomplete="off" />
-        <p class="hint">Fine-grained token scoped to this repo, Contents: Read and write only. Stored in this browser's localStorage — never written to the repo.</p>
+        <input id="token" type="password" placeholder="${esc(token ? maskToken(token) : "github_pat_...")}" autocomplete="current-password" />
+        <p class="hint">Fine-grained token scoped to this repo, Contents: Read and write only. Entered once per machine — it stays in this browser's localStorage until it expires, and is never written to the repo. Your password manager can save it (this is a password field).</p>
       </div>
       <div class="btn-row">
         <button id="test-conn" class="btn primary" type="button">Test connection</button>
@@ -91,21 +92,21 @@ export function renderSettings(root) {
       <div class="field-row">
         <div class="field">
           <label for="calories">Calories</label>
-          <input id="calories" type="number" class="num" value="${settings.targets.calories}" />
+          <input id="calories" type="number" class="num" value="${esc(settings.targets.calories)}" />
         </div>
         <div class="field">
           <label for="protein">Protein (g)</label>
-          <input id="protein" type="number" class="num" value="${settings.targets.protein}" />
+          <input id="protein" type="number" class="num" value="${esc(settings.targets.protein)}" />
         </div>
       </div>
       <div class="field-row">
         <div class="field">
           <label for="carbs">Carbs (g)</label>
-          <input id="carbs" type="number" class="num" value="${settings.targets.carbs}" />
+          <input id="carbs" type="number" class="num" value="${esc(settings.targets.carbs)}" />
         </div>
         <div class="field">
           <label for="fat">Fat (g)</label>
-          <input id="fat" type="number" class="num" value="${settings.targets.fat}" />
+          <input id="fat" type="number" class="num" value="${esc(settings.targets.fat)}" />
         </div>
       </div>
       <div class="btn-row">
@@ -189,7 +190,7 @@ function wireSettingsCard(root, initial) {
       const matches = JSON.stringify(readBack) === JSON.stringify(written);
       status.textContent = matches
         ? "Synced — write/read round-trip confirmed."
-        : "Synced, but read-back didn't match (raw CDN may be caching briefly).";
+        : "Synced, but read-back didn't match — check the repo's recent commits.";
       status.className = `status-line ${matches ? "ok" : "err"}`;
     } catch (err) {
       markDirty(SETTINGS_PATH);
@@ -209,6 +210,9 @@ function wireSettingsCard(root, initial) {
 }
 
 async function refreshSettingsFromRemote(root) {
+  // Never clobber the form with remote values while a local edit is waiting
+  // to be pushed.
+  if (getDirtySet().has(SETTINGS_PATH)) return;
   try {
     const remote = await readFile(SETTINGS_PATH);
     if (!remote) return;

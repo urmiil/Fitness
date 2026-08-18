@@ -5,13 +5,21 @@
 # which ships with Windows — no install step, consistent with the app's
 # no-build-step constraint.
 #
-# Usage:  .\serve.ps1            (serves this folder on http://localhost:8123)
+# Usage:  .\serve.ps1            (serves this folder on http://localhost:47613)
 #         .\serve.ps1 -Port 9000
 #
-# On macOS, use `python3 -m http.server 8123` instead.
+# On macOS, use `python3 -m http.server 47613` instead.
+#
+# Why port 47613 and not something memorable: the GitHub token lives in
+# localStorage, which is scoped to the origin — and http://localhost:PORT is
+# the SAME origin for anything else you ever serve on that port. A common
+# port (3000, 8000, 8080, 8123…) means some future dev server and its whole
+# npm dependency tree could read the token. Keep this port dedicated to this
+# app, and always serve it on the same port or the token/settings won't
+# follow you.
 
 param(
-  [int]$Port = 8123,
+  [int]$Port = 47613,
   [switch]$NoBrowser
 )
 
@@ -60,7 +68,7 @@ while ($listener.IsListening) {
     # Keep requests inside the served folder.
     $fullRoot = [System.IO.Path]::GetFullPath($Root)
     $fullReq  = [System.IO.Path]::GetFullPath($filePath)
-    if (-not $fullReq.StartsWith($fullRoot)) {
+    if (-not $fullReq.StartsWith($fullRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
       $res.StatusCode = 403
       return
     }
