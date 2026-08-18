@@ -2,7 +2,7 @@
 #
 # This machine has neither Node nor Python, so `npx serve .` and
 # `python -m http.server` aren't available. This uses .NET's HttpListener,
-# which ships with Windows — no install step, consistent with the app's
+# which ships with Windows - no install step, consistent with the app's
 # no-build-step constraint.
 #
 # Usage:  .\serve.ps1            (serves this folder on http://localhost:47613)
@@ -11,9 +11,9 @@
 # On macOS, use `python3 -m http.server 47613` instead.
 #
 # Why port 47613 and not something memorable: the GitHub token lives in
-# localStorage, which is scoped to the origin — and http://localhost:PORT is
+# localStorage, which is scoped to the origin - and http://localhost:PORT is
 # the SAME origin for anything else you ever serve on that port. A common
-# port (3000, 8000, 8080, 8123…) means some future dev server and its whole
+# port (3000, 8000, 8080, 8123...) means some future dev server and its whole
 # npm dependency tree could read the token. Keep this port dedicated to this
 # app, and always serve it on the same port or the token/settings won't
 # follow you.
@@ -30,8 +30,34 @@ $listener.Prefixes.Add("http://localhost:$Port/")
 try {
   $listener.Start()
 } catch {
-  Write-Host "Could not bind to port $Port. Is something already running there?" -ForegroundColor Red
-  Write-Host "Try:  .\serve.ps1 -Port 8124" -ForegroundColor Yellow
+  Write-Host ""
+  Write-Host "  Could not bind to port $Port - something is already listening." -ForegroundColor Red
+
+  # Almost always a previous instance of this script. Note that netstat/
+  # Get-NetTCPConnection report the owner as PID 4 (System) because
+  # HttpListener registers with the HTTP.SYS kernel driver, so match on the
+  # command line instead to find the real process.
+  #
+  # Require "-File ...serve.ps1" rather than a bare "serve.ps1" substring:
+  # any shell that merely mentions the name would otherwise be listed, and
+  # this prints Stop-Process commands the user is expected to run.
+  $stale = @(Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" |
+    Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -like "*-File*serve.ps1*" })
+
+  if ($stale) {
+    Write-Host "  An older serve.ps1 is still running. Stop it with:" -ForegroundColor Yellow
+    foreach ($p in $stale) { Write-Host "      Stop-Process -Id $($p.ProcessId) -Force" -ForegroundColor Cyan }
+    Write-Host "  Then run .\serve.ps1 again." -ForegroundColor Yellow
+  } else {
+    Write-Host "  It isn't another serve.ps1 - check what else uses this port." -ForegroundColor Yellow
+  }
+
+  # Deliberately NOT suggesting -Port <other>: the GitHub token and settings
+  # live in localStorage, which is scoped to http://localhost:$Port. Serving
+  # on a different port makes the app look signed out, and leaves the token
+  # sitting on the old origin. Free this port instead of moving off it.
+  Write-Host "  Avoid switching ports - the saved token is tied to this one." -ForegroundColor DarkGray
+  Write-Host ""
   exit 1
 }
 
