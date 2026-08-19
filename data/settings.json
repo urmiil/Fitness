@@ -3,9 +3,9 @@
   "weightUnit": "lb",
   "liftUnit": "lb",
   "targets": {
-    "calories": 2400,
-    "protein": 180,
-    "carbs": 240,
-    "fat": 70
+    "calories": 2100,
+    "protein": 124,
+    "carbs": 296.4,
+    "fat": 46.5
   }
 }
