@@ -5,6 +5,7 @@ import {
   setToken,
   hasToken,
   testConnection,
+  permissionHint,
   readFile,
   writeFile,
 } from "../github.js";
@@ -26,6 +27,8 @@ export function renderSettings(root) {
   root.innerHTML = `
     <h1>Settings</h1>
 
+    <div class="panes">
+      <section class="pane">
     <h2>GitHub connection</h2>
     <div class="card rise" style="--rise-i:0">
       <div class="field-row">
@@ -62,7 +65,9 @@ export function renderSettings(root) {
       </div>
       <p id="conn-status" class="status-line"></p>
     </div>
+      </section>
 
+      <section class="pane">
     <h2>Units &amp; targets</h2>
     <div class="card rise" style="--rise-i:1">
       <div class="field-row">
@@ -107,6 +112,8 @@ export function renderSettings(root) {
       </div>
       <p id="settings-status" class="status-line"></p>
     </div>
+      </section>
+    </div>
   `;
 
   wireConnectionCard(root);
@@ -130,10 +137,32 @@ function wireConnectionCard(root) {
     status.textContent = "Testing…";
     status.className = "status-line pending";
     const result = await testConnection();
-    status.textContent = result.ok
-      ? `Connected to ${result.data.full_name} (${result.data.private ? "private" : "public"})`
-      : `Failed: ${result.message}`;
-    status.className = `status-line ${result.ok ? "ok" : "err"}`;
+    if (!result.ok) {
+      status.textContent = `Failed: ${result.message}`;
+      status.className = "status-line err";
+      return;
+    }
+
+    // Reaching the repo is not the same as being able to write to it, and a
+    // read-only token gets all the way to the first sync before saying so.
+    const where = `${result.data.full_name} (${result.data.private ? "private" : "public"})`;
+    if (result.archived) {
+      status.textContent = `Connected to ${where}, but the repo is archived — GitHub refuses every write until it is unarchived.`;
+      status.className = "status-line err";
+    } else if (!result.canWrite) {
+      // Reads of a public repo need no grant at all, so this is the first
+      // moment anything can tell the user their token won't work.
+      status.textContent =
+        `Connected to ${where}, but this token cannot write` +
+        `${result.writeMessage ? ` (${result.writeMessage})` : ""}. ` +
+        `Open the token under GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens, and check both: ` +
+        `Repository access must list ${result.data.name} under "Only select repositories" — the "Public repositories" option is read-only — ` +
+        `and Repository permissions → Contents must be "Read and write". Edits take effect immediately; you don't need a new token.`;
+      status.className = "status-line err";
+    } else {
+      status.textContent = `Connected to ${where} — write access confirmed.`;
+      status.className = "status-line ok";
+    }
   });
 
   root.querySelector("#clear-token").addEventListener("click", () => {
@@ -186,7 +215,7 @@ function wireSettingsCard(root) {
       status.className = `status-line ${matches ? "ok" : "err"}`;
     } catch (err) {
       markDirty(SETTINGS_PATH);
-      status.textContent = `Sync failed: ${err.message}`;
+      status.textContent = `Sync failed: ${err.message}${permissionHint(err)}`;
       status.className = "status-line err";
     }
   });

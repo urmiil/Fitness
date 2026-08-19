@@ -35,3 +35,8 @@ export function getTargets() {
 export function weightUnit() {
   return getSettings().weightUnit;
 }
+
+/** Bodyweight and lifts have independent units (spec section 6). */
+export function liftUnit() {
+  return getSettings().liftUnit;
+}

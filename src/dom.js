@@ -29,3 +29,14 @@ export function int(value) {
   const n = Number(value);
   return Number.isFinite(n) ? Math.round(n) : 0;
 }
+
+// Like int(), but keeps up to `places` decimals — lifts move in 2.5 kg steps,
+// so rounding them to whole numbers would misreport a logged set. Still a
+// numeric coercion, so the result is safe to interpolate.
+export function dec(value, places = 1) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "0";
+  const factor = 10 ** places;
+  const rounded = Math.round(n * factor) / factor;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(places);
+}

@@ -40,6 +40,9 @@ export function renderFood(root) {
   root.innerHTML = `
     <h1>Food</h1>
 
+    <div class="panes" style="--pane-left: 30rem">
+      <section class="pane">
+
     <div class="card rise" style="--rise-i:0">
       <div class="field">
         <label for="f-date">Date</label>
@@ -100,8 +103,13 @@ export function renderFood(root) {
       <p id="f-status" class="status-line"></p>
     </div>
 
-    <h2>Logged</h2>
-    <div id="f-list"></div>
+      </section>
+
+      <section class="pane">
+        <h2>Logged</h2>
+        <div id="f-list"></div>
+      </section>
+    </div>
   `;
 
   const $ = (sel) => root.querySelector(sel);

@@ -3,8 +3,8 @@
 A single-user fitness tracker. Static site, no backend — data lives as JSON in
 this repo and is read/written through the GitHub API straight from the browser.
 
-**Status: Phase 3 of 6.** Weight and nutrition logging work end to end.
-Workouts are not built yet.
+**Status: Phase 4 of 6.** Weight, nutrition and workout logging all work end
+to end. History and charts are not built yet.
 
 ---
 
@@ -56,7 +56,17 @@ logging anything — needs a token:
    - **Permissions:** Repository permissions → **Contents: Read and write**
    - Nothing else. Set the longest expiry you're comfortable with.
 2. **Paste it into the app:** Settings → Personal access token, then
-   **Test connection** → expect `Connected to urmiil/Fitness (public)`.
+   **Test connection** → expect
+   `Connected to urmiil/Fitness (public) — write access confirmed`.
+
+> **If sync fails with 403** (`Resource not accessible by personal access
+> token`), the token can read but not write. Reading a public repo needs no
+> permission at all, so this only shows up at the first sync. On the token's
+> page check **both**: *Repository access* must list `Fitness` under "Only
+> select repositories" — the default "Public repositories" option is
+> read-only — and *Repository permissions → Contents* must be **Read and
+> write**. Editing an existing token takes effect immediately. Nothing is
+> lost meanwhile: entries stay queued in the badge until a sync succeeds.
 
 That's it — the token persists in that browser until it expires. You are
 never asked for it again on that machine. The field is a password field, so a
@@ -69,24 +79,35 @@ password manager will offer to save it for the eventual re-entry.
 - **Log a weigh-in:** Weight tab → the date defaults to today and the value
   prefills from your last entry, so most days it's two stepper taps and Save.
   Picking a date that already has an entry switches the form to editing it.
-- **Log food:** Food tab → pick the meal (it guesses from the clock), then tap
+- **Log food:** Food → pick the meal (it guesses from the clock), then tap
   a chip in the Recent row to add that food again in one tap. The row holds
   the last 20 distinct foods you've eaten, newest first. Anything new goes in
   the form below; the pencil on a chip loads it into the form so you can
   change the portion first. Daily totals are computed, never stored.
+- **Log a workout:** Workout → name the session and press Start, or tap a
+  chip in the Repeat row to reload a previous workout with its exercise list
+  already filled in. Add an exercise (it autocompletes against the movement
+  list, and offers to save anything new), then tap **Add set**. Each set
+  defaults to the one before it, and the first set of a repeated exercise
+  defaults to your top set from last time — so five sets is five taps. A set
+  at weight 0 counts as bodyweight. Tap a logged set to correct it. Session
+  volume adds up as you go, and several sessions on one day are fine.
 - **Everything saves locally first, instantly.** The badge in the header
   counts unsynced files — press it to push them to GitHub. Each sync is a
   commit, so your git history doubles as an audit log.
 - **Two machines:** log freely on both, even if you forget to sync. Syncing
   merges by entry (newest edit wins, deletes stick) instead of overwriting.
 - **Dashboard** shows current weight with a 30-day trend line, the 7-day
-  change, and today's calories and macros against your targets.
+  change, today's calories and macros against your targets, and whether a
+  workout is logged today with its name and total volume.
+- **Navigation** is the three-bar button at the top left; the badge beside it
+  is the sync button.
 - **Units** (lb/kg) and calorie/macro targets live in Settings and sync
   through the repo.
 
-Not built yet: workouts (Phase 4), history and charts (Phase 5), auto-sync
-polish (Phase 6). The full spec is in the local `fitness-tracker-spec.md`,
-deliberately gitignored — this repo is public.
+Not built yet: history and charts (Phase 5), auto-sync polish (Phase 6). The
+full spec is in the local `fitness-tracker-spec.md`, deliberately gitignored —
+this repo is public.
 
 ---
 
@@ -136,9 +157,10 @@ narrowly-scoped PAT in a dedicated origin is the sound design.
 ## Layout
 
 ```
-index.html          app shell + router mount
+index.html          app shell (menu + sync badge) + router mount
 style.css           dark theme, tabular figures, 48px touch targets,
-                    all motion behind prefers-reduced-motion
+                    full-width two-pane layout, all motion behind
+                    prefers-reduced-motion
 serve.ps1           static file server for Windows (dedicated port 47613)
 src/
   app.js            hash router, sync button, background refresh
@@ -149,13 +171,16 @@ src/
   sync.js           push dirty files, pull remote months
   weight.js         weight domain logic (upsert, tombstone, stats, units)
   nutrition.js      food domain logic (per-day entries, totals, recent foods)
+  workouts.js       workout domain logic (sessions, sets, volume, smart
+                    defaults, repeat-last)
+  exercises.js      the movement catalog behind autocomplete
   settings.js       units + targets, with defaults filled in
   manifest.js       month-file index handling
   dates.js          local-time date helpers (never toISOString for "today")
   dom.js            esc() XSS boundary + toast + int() numeric coercion
   id.js             sortable collision-resistant IDs
   anim.js           counters and previous-value memory for animations
-  screens/          dashboard.js, weight.js, food.js, settings.js
+  screens/          dashboard.js, weight.js, food.js, workout.js, settings.js
                     nutrition-summary.js, sparkline.js (shared fragments)
 data/
   manifest.json     index of which month files exist

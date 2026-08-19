@@ -9,13 +9,19 @@
 <body>
   <div class="app-shell">
     <header class="topbar">
-      <span class="brand">Fitness</span>
-      <nav class="tabs" aria-label="Primary">
+      <button id="menu-btn" class="menu-btn" type="button"
+              aria-haspopup="true" aria-expanded="false" aria-controls="menu" aria-label="Menu">
+        <span class="bars" aria-hidden="true"><i></i><i></i><i></i></span>
+      </button>
+
+      <nav id="menu" class="menu" aria-label="Primary" hidden>
         <a href="#/" data-route="/">Dashboard</a>
         <a href="#/weight" data-route="/weight">Weight</a>
         <a href="#/food" data-route="/food">Food</a>
+        <a href="#/workout" data-route="/workout">Workout</a>
         <a href="#/settings" data-route="/settings">Settings</a>
       </nav>
+
       <button id="sync-badge" class="sync-badge" type="button" title="Pending changes">0</button>
     </header>
 

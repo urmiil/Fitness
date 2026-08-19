@@ -3,7 +3,8 @@
 //
 // Read strategy:
 //   - token present -> authenticated Contents API. API reads are
-//     read-your-writes consistent; raw.githubusercontent.com sits behind a
+//     read-your-writes consistent *provided* the browser HTTP cache is out of
+//     the way (see apiFetch); raw.githubusercontent.com sits behind a
 //     ~5-minute CDN cache, so raw reads right after a sync would make
 //     just-saved data appear to revert.
 //   - no token, public repo -> raw.githubusercontent.com (fast, uncounted),
@@ -72,7 +73,53 @@ function apiFetch(url, opts = {}) {
   if (!url.startsWith(API_ORIGIN + "/")) {
     throw new Error(`Refusing to send credentials to non-API URL: ${url}`);
   }
-  return fetch(url, { ...opts, headers: authHeaders(opts.headers || {}) });
+  // cache: "no-store" is load-bearing, not hygiene. GitHub answers API reads
+  // with `Cache-Control: private, max-age=60`, so for a minute after a write
+  // the browser serves our own GET from its HTTP cache — with the file's
+  // pre-write sha. Writing against that sha 409s, and because the 409 retry
+  // re-reads through the same cache, it 409s again and the error surfaces.
+  // The API is read-your-writes consistent; the cache in front of it isn't.
+  return fetch(url, { ...opts, cache: "no-store", headers: authHeaders(opts.headers || {}) });
+}
+
+/**
+ * GitHub puts the actual reason in the response body — "Resource not accessible
+ * by personal access token", "Repository rule violations found", a secondary
+ * rate-limit notice. A bare status code sends you guessing, so keep the text
+ * and hang the status on the error for callers that want to react to it.
+ */
+async function apiError(res, what) {
+  let detail = "";
+  try {
+    const body = await res.json();
+    if (body?.message) detail = body.message;
+    const nested = (body?.errors || [])
+      .map((e) => e?.message || e?.code)
+      .filter(Boolean)
+      .join("; ");
+    if (nested) detail += detail ? ` (${nested})` : nested;
+  } catch {
+    // Non-JSON body — the status has to speak for itself.
+  }
+  const err = new Error(`${what} failed: ${res.status}${detail ? ` — ${detail}` : ""}`);
+  err.status = res.status;
+  return err;
+}
+
+/**
+ * The next step for a failed write, for errors whose message alone doesn't
+ * suggest one. A 403 here is almost always the token's Contents permission:
+ * reads succeed with read-only access, so nothing goes wrong until the first
+ * sync.
+ */
+export function permissionHint(err) {
+  if (err?.status !== 403) return "";
+  const text = String(err.message || "").toLowerCase();
+  if (text.includes("rule violation") || text.includes("protected branch")) {
+    return " — a branch rule on this repo is blocking direct pushes.";
+  }
+  if (text.includes("rate limit")) return " — GitHub is rate-limiting; wait a minute and sync again.";
+  return " — this token can read the repo but not write to it. Set Contents: Read and write on it, then test the connection again.";
 }
 
 function contentsUrl(path, { withRef = false } = {}) {
@@ -101,9 +148,51 @@ export async function testConnection() {
     }
     if (!res.ok) return { ok: false, status: res.status, message: `Unexpected error (${res.status})` };
     const data = await res.json();
-    return { ok: true, status: 200, message: "Connected", data };
+    // NB: data.permissions describes the *account's* rights on the repo, not
+    // the token's. A fine-grained PAT with no grant on this repo still reports
+    // admin/push true for the owner, and reads of a public repo need no grant
+    // at all — which is why a bad token gets all the way to the first sync
+    // before anything complains. Ask the write endpoint instead.
+    const write = await testWriteAccess();
+    return {
+      ok: true,
+      status: 200,
+      message: "Connected",
+      data,
+      canWrite: write.canWrite,
+      writeStatus: write.status,
+      writeMessage: write.message,
+      archived: Boolean(data?.archived),
+    };
   } catch (err) {
     return { ok: false, status: 0, message: err.message };
+  }
+}
+
+/**
+ * Does this token's Contents permission actually cover writing?
+ *
+ * The request is a PUT with no `content` field — invalid by construction, so it
+ * can never create a commit. GitHub authorizes the route before it validates
+ * the body, so a token without write access is refused with 403 while one that
+ * has it gets as far as 422 "content wasn't supplied". Treat only 403 as proof
+ * of the negative; anything else means authorization was passed.
+ */
+export async function testWriteAccess() {
+  if (!hasToken()) return { canWrite: false, status: 0, message: "No token set" };
+  try {
+    const res = await apiFetch(contentsUrl("data/.write-check"), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "write-access probe", branch: getConfig().branch }),
+    });
+    if (res.status === 403) {
+      const err = await apiError(res, "Write check");
+      return { canWrite: false, status: 403, message: err.message };
+    }
+    return { canWrite: true, status: res.status, message: "" };
+  } catch (err) {
+    return { canWrite: false, status: 0, message: err.message };
   }
 }
 
@@ -114,7 +203,7 @@ export async function testConnection() {
 async function getFileWithSha(path) {
   const res = await apiFetch(contentsUrl(path, { withRef: true }));
   if (res.status === 404) return { sha: undefined, data: null };
-  if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`);
+  if (!res.ok) throw await apiError(res, `GET ${path}`);
   const file = await res.json();
   const data = JSON.parse(base64ToUtf8(file.content));
   return { sha: file.sha, data };
@@ -162,7 +251,8 @@ export async function readFile(path) {
 export async function writeFile(path, transform, message) {
   if (!hasToken()) throw new Error("No token set — cannot write");
 
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 250 * attempt));
     const { sha, data: remote } = await getFileWithSha(path);
     const merged = transform(remote);
     const body = {
@@ -177,7 +267,8 @@ export async function writeFile(path, transform, message) {
       body: JSON.stringify(body),
     });
     if (res.ok) return merged;
-    if (res.status === 409 && attempt === 0) continue; // stale sha, re-GET and retry once
-    throw new Error(`PUT ${path} failed: ${res.status}`);
+    // Stale sha: re-GET (uncached now) and merge against what is really there.
+    if (res.status === 409 && attempt < 2) continue;
+    throw await apiError(res, `PUT ${path}`);
   }
 }

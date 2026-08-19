@@ -17,30 +17,37 @@ export function renderWeight(root) {
 
   root.innerHTML = `
     <h1>Weight</h1>
-    <div class="card rise" style="--rise-i:0">
-      <div class="field">
-        <label for="w-date">Date</label>
-        <input id="w-date" type="date" value="${today}" max="${today}" />
-      </div>
-      <div class="field">
-        <label for="w-weight">Weight (${esc(unit)})</label>
-        <div class="stepper-row">
-          <button id="w-minus" class="btn stepper" type="button" aria-label="Decrease weight by 0.1">−</button>
-          <input id="w-weight" type="number" class="num big-num" inputmode="decimal" step="0.1" min="0" placeholder="0.0" />
-          <button id="w-plus" class="btn stepper" type="button" aria-label="Increase weight by 0.1">＋</button>
+    <div class="panes" style="--pane-left: 26rem">
+      <section class="pane">
+        <div class="card rise" style="--rise-i:0">
+          <div class="field">
+            <label for="w-date">Date</label>
+            <input id="w-date" type="date" value="${today}" max="${today}" />
+          </div>
+          <div class="field">
+            <label for="w-weight">Weight (${esc(unit)})</label>
+            <div class="stepper-row">
+              <button id="w-minus" class="btn stepper" type="button" aria-label="Decrease weight by 0.1">&minus;</button>
+              <input id="w-weight" type="number" class="num big-num" inputmode="decimal" step="0.1" min="0" placeholder="0.0" />
+              <button id="w-plus" class="btn stepper" type="button" aria-label="Increase weight by 0.1">&plus;</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="w-note">Note <span class="dim">(optional)</span></label>
+            <input id="w-note" type="text" maxlength="200" />
+          </div>
+          <div class="btn-row">
+            <button id="w-save" class="btn primary" type="button">Save</button>
+          </div>
+          <p id="w-status" class="status-line"></p>
         </div>
-      </div>
-      <div class="field">
-        <label for="w-note">Note <span class="dim">(optional)</span></label>
-        <input id="w-note" type="text" maxlength="200" />
-      </div>
-      <div class="btn-row">
-        <button id="w-save" class="btn primary" type="button">Save</button>
-      </div>
-      <p id="w-status" class="status-line"></p>
+      </section>
+
+      <section class="pane">
+        <h2>Last 60 days</h2>
+        <div id="w-list"></div>
+      </section>
     </div>
-    <h2>Last 60 days</h2>
-    <div id="w-list"></div>
   `;
 
   const $ = (sel) => root.querySelector(sel);
