@@ -10,7 +10,7 @@
 import { getCached, setCached, markDirty } from "./store.js";
 import { genId } from "./id.js";
 import { mergeEntries, visibleOnly } from "./merge.js";
-import { monthOf, prevMonthOf, todayLocalISO, nowISO } from "./dates.js";
+import { monthOf, prevMonthOf, todayLocalISO, nowISO, monthsBetween } from "./dates.js";
 import { registerMonth } from "./manifest.js";
 
 export const nutritionPath = (ym) => `data/nutrition/${ym}.json`;
@@ -153,6 +153,45 @@ export function recentFoods(limit = 20) {
     if (seen.size >= limit) break;
   }
   return [...seen.values()];
+}
+
+/**
+ * Visible entries for every day in [fromDate, toDate], as a Map of
+ * date -> entries[]. Days with nothing logged are simply absent. Reads only
+ * cached months — history views ensure the pull separately.
+ */
+export function entriesByDate(fromDate, toDate) {
+  const byDate = new Map();
+  for (const ym of monthsBetween(fromDate, toDate)) {
+    for (const day of getNutritionMonth(ym).days) {
+      if (day.date < fromDate || day.date > toDate) continue;
+      const live = visibleOnly(day.entries);
+      if (live.length) byDate.set(day.date, live.sort(byIdAsc));
+    }
+  }
+  return byDate;
+}
+
+/**
+ * The most recent food logged under `meal` before `beforeDate` — what an
+ * empty meal group offers to repeat in one tap.
+ */
+export function lastFoodForMeal(meal, beforeDate = todayLocalISO()) {
+  const target = normalizeMeal(meal);
+  const ym = monthOf(todayLocalISO());
+  let best = null;
+  for (const m of new Set([ym, prevMonthOf(ym)])) {
+    for (const day of getNutritionMonth(m).days) {
+      if (day.date >= beforeDate) continue;
+      for (const e of visibleOnly(day.entries)) {
+        if (normalizeMeal(e.meal) !== target) continue;
+        if (!best || day.date > best.date || (day.date === best.date && String(e.updatedAt) > String(best.updatedAt))) {
+          best = { ...e, date: day.date };
+        }
+      }
+    }
+  }
+  return best;
 }
 
 /** Best guess from the clock, so the common case needs no meal tap. */

@@ -1,7 +1,8 @@
 import { esc, int, showToast } from "../dom.js";
 import { subscribe, dirtyCount } from "../store.js";
-import { todayLocalISO } from "../dates.js";
+import { todayLocalISO, addDays, monthOf } from "../dates.js";
 import { getTargets, SETTINGS_PATH } from "../settings.js";
+import { ensureHistory } from "../sync.js";
 import { nutritionSummaryHtml } from "./nutrition-summary.js";
 import { countUp } from "../anim.js";
 import {
@@ -10,6 +11,8 @@ import {
   updateFood,
   deleteFood,
   entriesFor,
+  entriesByDate,
+  lastFoodForMeal,
   totals,
   recentFoods,
   defaultMeal,
@@ -106,8 +109,17 @@ export function renderFood(root) {
       </section>
 
       <section class="pane">
-        <h2>Logged</h2>
+        <div class="card rise" style="--rise-i:2">
+          <div class="card-head">
+            <h2 class="card-title" id="f-week-head">Last 7 days</h2>
+            <span class="pill num" id="f-week-avg" hidden></span>
+          </div>
+          <div id="f-week"></div>
+        </div>
+
+        <h2 id="f-logged-head">Logged</h2>
         <div id="f-list"></div>
+        <div id="f-day-foot"></div>
       </section>
     </div>
   `;
@@ -124,6 +136,11 @@ export function renderFood(root) {
   const totalsEl = $("#f-totals");
   const listEl = $("#f-list");
   const formEl = $("#f-form");
+  const weekHead = $("#f-week-head");
+  const weekAvg = $("#f-week-avg");
+  const weekEl = $("#f-week");
+  const loggedHead = $("#f-logged-head");
+  const dayFootEl = $("#f-day-foot");
 
   const macroEls = {
     calories: $("#f-calories"),
@@ -136,6 +153,11 @@ export function renderFood(root) {
   // of round-tripping its numbers through DOM attributes.
   let recents = [];
   let editingId = null;
+  // What each empty meal group offers to repeat, keyed by meal, refreshed on
+  // every list render — same lookup-by-render pattern as the chips.
+  let ghosts = {};
+  // Meal cards rise once per visit, not on every logged food.
+  let listAnimated = false;
 
   function setStatus(msg, kind = "") {
     statusEl.textContent = msg;
@@ -203,16 +225,41 @@ export function renderFood(root) {
   }
 
   function renderList() {
-    const entries = entriesFor(dateEl.value);
-    if (!entries.length) {
-      listEl.innerHTML = `<div class="empty-state">Nothing logged for this day.</div>`;
-      return;
-    }
+    const date = dateEl.value;
+    const entries = entriesFor(date);
+    loggedHead.textContent = `Logged — ${headDate(date)}`;
+
+    const rise = listAnimated ? "" : " rise";
     let row = 0;
-    listEl.innerHTML = MEALS.map((meal) => {
+    ghosts = {};
+
+    // Every meal renders — an empty one becomes an invitation to repeat what
+    // that meal usually is, instead of blank space.
+    listEl.innerHTML = `<div class="meal-grid">${MEALS.map((meal) => {
       const group = entries.filter((e) => normalizeMeal(e.meal) === meal);
-      if (!group.length) return "";
-      return `<div class="meal-group rise" style="--rise-i:${row++}">
+      const i = row++;
+      if (!group.length) {
+        const suggestion = lastFoodForMeal(meal, date);
+        if (suggestion) ghosts[meal] = suggestion;
+        return `<div class="meal-group ghost${rise}" style="--rise-i:${i}">
+          <div class="meal-head" style="border-bottom-color:var(--hairline)">
+            <span class="meal-name">${esc(MEAL_LABELS[meal])}</span>
+            <span class="meal-total num dim">&mdash;</span>
+          </div>
+          <div class="ghost-body">
+            ${
+              suggestion
+                ? `<span>Nothing yet &mdash; repeat a recent ${esc(MEAL_LABELS[meal].toLowerCase())}?</span>
+                   <span class="chip-group"><button type="button" class="chip" data-ghost-meal="${esc(meal)}">
+                     <span class="chip-name">${esc(suggestion.name)}</span>
+                     <span class="chip-cal num">${int(suggestion.calories)}</span>
+                   </button></span>`
+                : `<span>Nothing yet.</span>`
+            }
+          </div>
+        </div>`;
+      }
+      return `<div class="meal-group${rise}" style="--rise-i:${i}">
         <div class="meal-head">
           <span class="meal-name">${esc(MEAL_LABELS[meal])}</span>
           <span class="meal-total num">${int(totals(group).calories)}<span class="dim"> kcal</span></span>
@@ -237,12 +284,84 @@ export function renderFood(root) {
           )
           .join("")}
       </div>`;
-    }).join("");
+    }).join("")}</div>`;
+    listAnimated = true;
+  }
+
+  /** The whole day in one line under the grid; computed at render, never stored. */
+  function renderDayFoot() {
+    const entries = entriesFor(dateEl.value);
+    if (!entries.length) {
+      dayFootEl.innerHTML = "";
+      return;
+    }
+    const t = totals(entries);
+    const target = int(getTargets().calories);
+    const left = target - int(t.calories);
+    dayFootEl.innerHTML = `<div class="day-foot">
+      <span class="day-foot-label">Day total</span>
+      <b class="num">${int(t.calories).toLocaleString()} kcal</b>
+      <span class="pip p num">${int(t.protein)} p</span>
+      <span class="pip c num">${int(t.carbs)} c</span>
+      <span class="pip f num">${int(t.fat)} f</span>
+      ${
+        target > 0
+          ? `<span class="day-foot-left num">${
+              left >= 0 ? `${int(left).toLocaleString()} under target` : `${int(-left).toLocaleString()} over target`
+            }</span>`
+          : ""
+      }
+    </div>`;
+  }
+
+  /** Seven calorie bars ending on the selected day, with the target line. */
+  function renderWeek() {
+    const end = dateEl.value;
+    const start = addDays(end, -6);
+    const byDate = entriesByDate(start, end);
+    const target = int(getTargets().calories);
+
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const date = addDays(start, i);
+      const list = byDate.get(date);
+      days.push({ date, calories: list ? int(totals(list).calories) : null });
+    }
+
+    const logged = days.filter((d) => d.calories !== null);
+    weekAvg.hidden = !logged.length;
+    if (logged.length) {
+      const avg = logged.reduce((s, d) => s + d.calories, 0) / logged.length;
+      weekAvg.innerHTML = `avg ${int(avg).toLocaleString()} kcal`;
+    }
+    weekHead.textContent = end === today ? "Last 7 days" : `Week to ${headDate(end)}`;
+
+    const scale = Math.max(target, ...days.map((d) => d.calories || 0), 1);
+    const H = 88;
+    weekEl.innerHTML = `
+      <div class="week-bars" style="height:${H}px">
+        ${
+          target > 0
+            ? `<div class="wb-target" style="bottom:${int(Math.min(H, (target / scale) * H))}px"><span class="num">${target}</span></div>`
+            : ""
+        }
+        ${days
+          .map((d) => {
+            const none = d.calories === null;
+            const h = none ? 2 : Math.max(3, Math.round((d.calories / scale) * H));
+            const cls = none ? "wb none" : d.date === end ? "wb today" : "wb";
+            return `<div class="${cls}" title="${esc(d.date)}${none ? "" : ` &mdash; ${int(d.calories)} kcal`}"><i style="height:${int(h)}px"></i></div>`;
+          })
+          .join("")}
+      </div>
+      <div class="wb-days">${days.map((d) => `<span>${esc(dayLetter(d.date))}</span>`).join("")}</div>`;
   }
 
   function redraw() {
     renderTotals();
     renderList();
+    renderDayFoot();
+    renderWeek();
     renderRecent();
   }
 
@@ -254,6 +373,8 @@ export function renderFood(root) {
   dateEl.addEventListener("change", () => {
     resetForm(); // whatever was being edited belongs to the day we just left
     setStatus("");
+    // Browsing back may need a month the startup refresh never pulled.
+    ensureHistory(["nutrition"], monthOf(addDays(dateEl.value, -13)));
     redraw();
   });
 
@@ -266,7 +387,9 @@ export function renderFood(root) {
     if (!food) return;
     if (adding) {
       const meal = currentMeal();
-      addFood({ date: dateEl.value, ...food, meal });
+      // Spread first: the remembered food carries its original date, which
+      // must not override the day being logged.
+      addFood({ ...food, date: dateEl.value, meal });
       showToast(`Added ${food.name} to ${MEAL_LABELS[meal].toLowerCase()}`, "ok");
     } else {
       fillForm({ ...food, meal: currentMeal() });
@@ -303,6 +426,15 @@ export function renderFood(root) {
   });
 
   listEl.addEventListener("click", (ev) => {
+    const ghostBtn = ev.target.closest("[data-ghost-meal]");
+    if (ghostBtn) {
+      const meal = ghostBtn.dataset.ghostMeal;
+      const food = ghosts[meal];
+      if (!food) return;
+      addFood({ ...food, date: dateEl.value, meal });
+      showToast(`Added ${food.name} to ${MEAL_LABELS[normalizeMeal(meal)].toLowerCase()}`, "ok");
+      return;
+    }
     const btn = ev.target.closest("[data-edit], [data-del]");
     if (!btn) return;
     const { edit, del } = btn.dataset;
@@ -329,7 +461,11 @@ export function renderFood(root) {
   const unsub = subscribe((path) => {
     if (typeof path !== "string") return;
     if (path.startsWith("data/nutrition/")) redraw();
-    else if (path === SETTINGS_PATH) renderTotals();
+    else if (path === SETTINGS_PATH) {
+      renderTotals();
+      renderWeek();
+      renderDayFoot();
+    }
   });
 
   setMeal(defaultMeal());
@@ -340,4 +476,19 @@ export function renderFood(root) {
 function numberIn(el) {
   const raw = el.value.trim();
   return raw === "" ? 0 : Number(raw);
+}
+
+/** "Tuesday, August 18" for a YYYY-MM-DD string, in local time. */
+function headDate(date) {
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+function dayLetter(date) {
+  const [y, m, d] = date.split("-").map(Number);
+  return "MTWTFSS"[(new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7];
 }

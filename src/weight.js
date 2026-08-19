@@ -6,7 +6,7 @@ import { getCached, setCached, markDirty } from "./store.js";
 import { genId } from "./id.js";
 import { mergeEntries, visibleOnly } from "./merge.js";
 import { monthOf, prevMonthOf, todayLocalISO, nowISO, daysBetween } from "./dates.js";
-import { registerMonth } from "./manifest.js";
+import { registerMonth, getManifest } from "./manifest.js";
 
 export const weightPath = (ym) => `data/weight/${ym}.json`;
 const skeleton = (ym) => ({ schemaVersion: 1, month: ym, entries: [] });
@@ -76,6 +76,20 @@ export function recentEntries(days = 60) {
       return age >= 0 && age <= days;
     })
     .sort((a, b) => byDateAsc(b, a));
+}
+
+/**
+ * Every visible entry across every month file in the cache, newest first.
+ * The manifest names the months; only ones already pulled contribute — the
+ * history screens ask sync.js#ensureHistory to fill gaps, and re-render as
+ * each month lands.
+ */
+export function allEntries() {
+  const today = monthOf(todayLocalISO());
+  const months = new Set([today, prevMonthOf(today), ...(getManifest().months.weight || [])]);
+  const all = [];
+  for (const ym of months) all.push(...visibleOnly(getWeightMonth(ym).entries));
+  return all.sort((a, b) => byDateAsc(b, a));
 }
 
 /** Dashboard stats in the given display unit; null when nothing is logged. */

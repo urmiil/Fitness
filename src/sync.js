@@ -8,7 +8,7 @@ import { mergeWeightFile, weightPath } from "./weight.js";
 import { mergeNutritionFile, nutritionPath } from "./nutrition.js";
 import { mergeWorkoutFile, workoutPath } from "./workouts.js";
 import { EXERCISES_PATH, mergeExercises } from "./exercises.js";
-import { MANIFEST_PATH, mergeManifest } from "./manifest.js";
+import { MANIFEST_PATH, mergeManifest, getManifest } from "./manifest.js";
 import { SETTINGS_PATH } from "./settings.js";
 
 // Every month-file domain: where its files live and how two copies reconcile.
@@ -105,3 +105,48 @@ async function refreshSingleton(path) {
 
 export const refreshSettings = () => refreshSingleton(SETTINGS_PATH);
 export const refreshExercises = () => refreshSingleton(EXERCISES_PATH);
+
+/**
+ * Pull the remote manifest and union it with ours. Unlike the other
+ * singletons this merges instead of skipping while dirty — a month list only
+ * ever grows, so the union can't clobber a pending local registration.
+ */
+export async function refreshManifest() {
+  try {
+    const remote = await readFile(MANIFEST_PATH);
+    if (!remote) return;
+    const merged = mergeManifest(remote, getManifest());
+    if (JSON.stringify(merged) !== JSON.stringify(getCached(MANIFEST_PATH))) {
+      setCached(MANIFEST_PATH, merged);
+    }
+  } catch {
+    // Offline — the cached manifest stands.
+  }
+}
+
+// Month files this session has already tried to pull, so a screen that mounts
+// twenty times doesn't re-request a month that isn't there.
+const historyAttempted = new Set();
+
+/**
+ * Make sure the cache holds every month file a history view needs: months the
+ * manifest lists for `domain` from `sinceYm` on (all of them when null) that
+ * were never pulled here. Fire-and-forget — screens call this on mount or on a
+ * range switch, and the store notifies as each month lands (spec section 6 /
+ * handoff: pull on demand via the manifest, don't widen the startup refresh).
+ */
+export function ensureHistory(domains, sinceYm = null) {
+  const manifest = getManifest();
+  for (const domain of domains) {
+    if (!DOMAINS[domain]) continue;
+    const need = (manifest.months[domain] || []).filter((ym) => {
+      if (sinceYm && ym < sinceYm) return false;
+      const key = `${domain}:${ym}`;
+      if (historyAttempted.has(key)) return false;
+      if (getCached(DOMAINS[domain].path(ym)) != null) return false;
+      historyAttempted.add(key);
+      return true;
+    });
+    if (need.length) refreshMonths(domain, need);
+  }
+}

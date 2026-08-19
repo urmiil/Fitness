@@ -10,8 +10,10 @@
 
 import { esc, int, dec, showToast } from "../dom.js";
 import { subscribe, dirtyCount } from "../store.js";
-import { todayLocalISO, daysBetween } from "../dates.js";
+import { todayLocalISO, daysBetween, addDays, monthOf } from "../dates.js";
 import { liftUnit, SETTINGS_PATH } from "../settings.js";
+import { MANIFEST_PATH } from "../manifest.js";
+import { ensureHistory } from "../sync.js";
 import { countUp, trackValue } from "../anim.js";
 import {
   EXERCISES_PATH,
@@ -38,7 +40,10 @@ import {
   lastSetFor,
   recentWorkoutNames,
   recentWorkouts,
+  allWorkouts,
   lastWorkoutNamed,
+  topSet,
+  movementRecords,
 } from "../workouts.js";
 
 export function renderWorkout(root) {
@@ -57,6 +62,10 @@ export function renderWorkout(root) {
 
   let activeId = null;
   let unknown = ""; // an exercise name typed that the catalog doesn't have
+  // The rest state's session cards as last drawn, for index lookup on tap.
+  let restSessions = [];
+  // Rest-state cards rise once per visit, not on every store notify.
+  let restDrawn = false;
 
   root.innerHTML = `
     <h1>Workout</h1>
@@ -101,7 +110,7 @@ export function renderWorkout(root) {
       </section>
 
       <section class="pane">
-        <h2>Exercises</h2>
+        <h2 id="wo-right-head">Exercises</h2>
         <div id="wo-body"></div>
         <div class="card" id="wo-add-card">
           <div class="field">
@@ -123,6 +132,7 @@ export function renderWorkout(root) {
   `;
 
   const $ = (sel) => root.querySelector(sel);
+  const rightHead = $("#wo-right-head");
   const dateEl = $("#wo-date");
   const sessionEl = $("#wo-session");
   const renameWrap = $("#wo-rename-wrap");
@@ -138,6 +148,7 @@ export function renderWorkout(root) {
   const statusEl = $("#wo-status");
   const sessionsEl = $("#wo-sessions");
   const bodyEl = $("#wo-body");
+  const addCard = $("#wo-add-card");
   const exInput = $("#wo-ex");
   const exList = $("#wo-ex-list");
   const exStatus = $("#wo-ex-status");
@@ -266,9 +277,10 @@ export function renderWorkout(root) {
     const focusKey = document.activeElement?.dataset?.fk || "";
 
     if (!workout) {
-      bodyEl.innerHTML = `<div class="empty-state">Start a session to log sets.</div>`;
+      renderRest();
       return;
     }
+    rightHead.textContent = "Exercises";
     const exercises = workout.exercises || [];
     if (!exercises.length) {
       bodyEl.innerHTML = `<div class="empty-state">No exercises yet &mdash; add one below.</div>`;
@@ -385,6 +397,106 @@ export function renderWorkout(root) {
       </div>`;
   }
 
+  /**
+   * The pane between sessions: a browsable training log instead of an empty
+   * box. Recent sessions as cards (repeat or open in one tap) above a
+   * movements table — last done, best set, estimated 1RM, all computed at
+   * render (spec section 4).
+   */
+  function renderRest() {
+    restSessions = allWorkouts().slice(0, 3);
+    if (!restSessions.length) {
+      rightHead.textContent = "Exercises";
+      bodyEl.innerHTML = `<div class="empty-state">Start a session to log sets.</div>`;
+      return;
+    }
+    rightHead.textContent = "Recent sessions";
+    const u = unit();
+    const rise = restDrawn ? "" : " rise";
+
+    const cards = restSessions
+      .map((w, i) => {
+        const isToday = w.date === today;
+        const top = topSet(w, u);
+        const nEx = (w.exercises || []).length;
+        return `<div class="card vcard${rise}" style="--rise-i:${i}">
+          <div class="card-head" style="margin-bottom:0.2rem">
+            <h3 class="sess-title">${esc(w.name)}</h3>
+            <span class="pill${isToday ? " hit" : ""}">${isToday ? "today" : esc(sessDate(w.date))}</span>
+          </div>
+          <div class="sess-meta">
+            <span class="pill num">${int(volume(w, u))} ${esc(u)}</span>
+            <span class="pill num">${setCount(w)} set${setCount(w) === 1 ? "" : "s"}</span>
+            <span class="pill num">${nEx} movement${nEx === 1 ? "" : "s"}</span>
+          </div>
+          ${
+            top
+              ? `<div class="sess-top"><span class="k">Top set</span><span class="num" style="font-weight:700">${esc(top.name)} ${fmtSet(top)}</span></div>`
+              : ""
+          }
+          <div class="btn-row">
+            <button type="button" class="btn small primary" data-rest-repeat="${i}">Repeat</button>
+            <button type="button" class="btn small" data-rest-open="${i}">Open</button>
+          </div>
+        </div>`;
+      })
+      .join("");
+
+    const { records } = movementRecords(u);
+    const cutoff = addDays(today, -30);
+    const rows = records
+      .slice(0, 8)
+      .map(
+        (r) => `<tr>
+          <td class="mv-name">${esc(r.name)}</td>
+          <td class="mv-dim">${esc(relDate(r.lastDate))}</td>
+          <td class="r num">${r.best ? fmtSet(r.best) : "&mdash;"}</td>
+          <td class="r num">${r.est > 0 ? `<span${r.date >= cutoff ? ` class="mv-recent"` : ""}>${int(r.est)}</span>` : "&mdash;"}</td>
+          <td class="r num">${int(r.sessions)}</td>
+        </tr>`
+      )
+      .join("");
+
+    bodyEl.innerHTML = `
+      <div class="grid-cards">
+        ${cards}
+        <button type="button" class="card sess-ghost${rise}" style="--rise-i:${restSessions.length}" data-rest-start>
+          + Start an empty session
+        </button>
+      </div>
+      <h2>Movements</h2>
+      <div class="card mv-wrap${rise}">
+        <table class="mv-table">
+          <thead><tr><th>Movement</th><th>Last done</th><th class="r">Top set</th><th class="r">Est 1RM <span class="dim">${esc(u)}</span></th><th class="r">Sessions</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+    restDrawn = true;
+  }
+
+  function fmtSet(set) {
+    const w = Number(set?.weight) || 0;
+    return `${w > 0 ? `${dec(w)} ${esc(set.unit === "kg" ? "kg" : "lb")}` : "BW"} &times; ${int(set?.reps)}`;
+  }
+
+  function sessDate(date) {
+    const [y, m, d] = date.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  function relDate(date) {
+    const age = daysBetween(date, today);
+    if (age <= 0) return "today";
+    if (age === 1) return "yesterday";
+    if (age <= 13) return `${age} days ago`;
+    const [y, m, d] = date.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+
   /* ── Wiring ──────────────────────────────────────────────────────────── */
 
   function redraw() {
@@ -393,6 +505,7 @@ export function renderWorkout(root) {
     renderStart(workout);
     renderSessions(workout);
     renderBody(workout);
+    addCard.hidden = !workout;
     exStatus.classList.toggle("dim", !workout);
   }
 
@@ -571,6 +684,40 @@ export function renderWorkout(root) {
   });
 
   bodyEl.addEventListener("click", (ev) => {
+    // Rest-state taps first — those cards aren't exercise cards.
+    const repBtn = ev.target.closest("[data-rest-repeat]");
+    if (repBtn) {
+      const w = restSessions[Number(repBtn.dataset.restRepeat)];
+      if (!w) return;
+      const made = startFromLast(dateEl.value, w.name);
+      activeId = made.id;
+      setStatus(
+        `${w.name} loaded with ${made.exercises.length} exercise${made.exercises.length === 1 ? "" : "s"}.`,
+        "ok"
+      );
+      redraw();
+      showToast(`Repeating ${w.name}`, "ok");
+      return;
+    }
+    const openBtn = ev.target.closest("[data-rest-open]");
+    if (openBtn) {
+      const w = restSessions[Number(openBtn.dataset.restOpen)];
+      if (!w) return;
+      dateEl.value = w.date;
+      activeId = w.id;
+      drafts.clear();
+      editing.clear();
+      seenExercises.clear();
+      seenSets.clear();
+      setStatus("");
+      redraw();
+      return;
+    }
+    if (ev.target.closest("[data-rest-start]")) {
+      newNameEl.focus();
+      return;
+    }
+
     const found = cardOf(ev.target);
     if (!found) return;
     const { card, exId } = found;
@@ -659,8 +806,11 @@ export function renderWorkout(root) {
     if (typeof path !== "string") return;
     if (path.startsWith("data/workouts/") || path === SETTINGS_PATH) redraw();
     else if (path === EXERCISES_PATH) refreshExerciseList();
+    else if (path === MANIFEST_PATH) ensureHistory(["workouts"], monthOf(addDays(today, -120)));
   });
 
+  // The movements table reads further back than the startup refresh.
+  ensureHistory(["workouts"], monthOf(addDays(today, -120)));
   refreshExerciseList();
   redraw();
   return unsub;

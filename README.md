@@ -3,8 +3,10 @@
 A single-user fitness tracker. Static site, no backend — data lives as JSON in
 this repo and is read/written through the GitHub API straight from the browser.
 
-**Status: Phase 4 of 6.** Weight, nutrition and workout logging all work end
-to end. History and charts are not built yet.
+**Status: Phase 5 of 6.** Weight, nutrition and workout logging all work end
+to end, and every screen now carries its history: charts, streaks, records
+and weekly summaries, all computed at render from the month files. Remaining:
+Phase 6 polish (debounced auto-sync).
 
 ---
 
@@ -97,17 +99,27 @@ password manager will offer to save it for the eventual re-entry.
   commit, so your git history doubles as an audit log.
 - **Two machines:** log freely on both, even if you forget to sync. Syncing
   merges by entry (newest edit wins, deletes stick) instead of overwriting.
-- **Dashboard** shows current weight with a 30-day trend line, the 7-day
-  change, today's calories and macros against your targets, and whether a
-  workout is logged today with its name and total volume.
+- **Dashboard** is an instrument panel: today's weight (30-day trend line,
+  7-day change), calories and macros against targets, and today's workout
+  with its volume and top set — then a consistency heatmap (16 weeks, one
+  cell per day, brightness = how many of weight/food/workout you logged, with
+  current and best streaks), a last-7-days card (calorie bars against the
+  target line, workouts, volume, weight movement, each with a delta vs the
+  week before), a recent-activity feed across all three domains, and a
+  records card with your best set and estimated 1RM per movement.
+- **History lives where you log.** Weight has a range chart (30 d / 90 d /
+  1 y / all), stat tiles and a weekly-grouped list; Food shows the week's
+  calorie bars above the day's meals (empty meals offer a one-tap repeat of a
+  recent one); Workout's resting state is a browsable training log — recent
+  sessions with Repeat/Open buttons and a movements table (last done, top
+  set, est 1RM). Older months load on demand via the manifest.
 - **Navigation** is the three-bar button at the top left; the badge beside it
   is the sync button.
 - **Units** (lb/kg) and calorie/macro targets live in Settings and sync
   through the repo.
 
-Not built yet: history and charts (Phase 5), auto-sync polish (Phase 6). The
-full spec is in the local `fitness-tracker-spec.md`, deliberately gitignored —
-this repo is public.
+Not built yet: auto-sync polish (Phase 6). The full spec is in the local
+`fitness-tracker-spec.md`, deliberately gitignored — this repo is public.
 
 ---
 
@@ -172,7 +184,9 @@ src/
   weight.js         weight domain logic (upsert, tombstone, stats, units)
   nutrition.js      food domain logic (per-day entries, totals, recent foods)
   workouts.js       workout domain logic (sessions, sets, volume, smart
-                    defaults, repeat-last)
+                    defaults, repeat-last, movement records / est 1RM)
+  insights.js       cross-domain dashboard aggregation (heatmap, streaks,
+                    week summary, activity feed) — derived at render
   exercises.js      the movement catalog behind autocomplete
   settings.js       units + targets, with defaults filled in
   manifest.js       month-file index handling
@@ -181,7 +195,8 @@ src/
   id.js             sortable collision-resistant IDs
   anim.js           counters and previous-value memory for animations
   screens/          dashboard.js, weight.js, food.js, workout.js, settings.js
-                    nutrition-summary.js, sparkline.js (shared fragments)
+                    nutrition-summary.js, sparkline.js (sparkline + the
+                    axed range chart — both hand-rolled SVG)
 data/
   manifest.json     index of which month files exist
   settings.json     units + targets (synced, no secrets)

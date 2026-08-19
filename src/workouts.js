@@ -17,7 +17,7 @@ import { getCached, setCached, markDirty } from "./store.js";
 import { genId } from "./id.js";
 import { mergeEntries, visibleOnly } from "./merge.js";
 import { monthOf, prevMonthOf, todayLocalISO, nowISO } from "./dates.js";
-import { registerMonth } from "./manifest.js";
+import { registerMonth, getManifest } from "./manifest.js";
 import { convertWeight, round1 } from "./weight.js";
 import { liftUnit } from "./settings.js";
 
@@ -323,6 +323,108 @@ export function lastWorkoutNamed(name, { excludeId } = {}) {
   const k = key(name);
   if (!k) return null;
   return recentWorkouts().find((w) => key(w.name) === k && w.id !== excludeId) || null;
+}
+
+/**
+ * Every visible session across every cached month file, newest first. The
+ * manifest names the months; only ones already in the cache contribute —
+ * history views ask sync.js#ensureHistory to fill gaps and re-render as each
+ * month lands.
+ */
+export function allWorkouts() {
+  const now = monthOf(todayLocalISO());
+  const months = new Set([now, prevMonthOf(now), ...(getManifest().months.workouts || [])]);
+  const all = [];
+  for (const ym of months) all.push(...visibleOnly(getWorkoutMonth(ym).workouts));
+  return all.sort(byRecency);
+}
+
+/**
+ * Epley estimate of a one-rep max — a render-time formula, never stored
+ * (spec section 4). Returns 0 for bodyweight or repless sets, which callers
+ * treat as "no estimate".
+ */
+export function est1RM(weight, reps) {
+  const w = toNum(weight);
+  const r = toNum(reps);
+  if (w <= 0 || r <= 0) return 0;
+  return r === 1 ? w : w * (1 + r / 30);
+}
+
+/** The session's best-scoring set: {name, weight, reps, unit} or null. */
+export function topSet(workout, unit = liftUnit()) {
+  let best = null;
+  let bestScore = 0;
+  for (const ex of workout?.exercises || []) {
+    for (const s of ex.sets || []) {
+      const conv = setIn(s, unit);
+      const score = est1RM(conv.weight, conv.reps);
+      if (score > bestScore) {
+        bestScore = score;
+        best = { name: String(ex.name || "").trim(), weight: toNum(s.weight), reps: toNum(s.reps), unit: unitOf(s.unit) };
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * One ascending pass over every cached session, tracking each movement's best
+ * set by estimated 1RM (in `unit`). Returns:
+ *   records — one per movement: { name, best:{weight,reps,unit}|null, est,
+ *             date, lastDate, sessions }, sorted best-estimate first (then
+ *             most recently done, for bodyweight-only movements).
+ *   prs     — the moments a movement's previous best was beaten (first-ever
+ *             sessions don't count), newest first: { name, best, est, date,
+ *             workoutId }.
+ * All derived at render, per spec section 4.
+ */
+export function movementRecords(unit = liftUnit()) {
+  const sessions = allWorkouts().slice().reverse(); // oldest -> newest
+  const byKey = new Map();
+  const prs = [];
+
+  for (const w of sessions) {
+    for (const ex of w.exercises || []) {
+      const k = key(ex.name);
+      if (!k) continue;
+      let rec = byKey.get(k);
+      if (!rec) {
+        rec = { name: "", best: null, est: 0, date: null, lastDate: w.date, sessions: 0 };
+        byKey.set(k, rec);
+      }
+      rec.sessions++;
+      if (w.date > rec.lastDate) rec.lastDate = w.date;
+      rec.name = String(ex.name).trim() || rec.name;
+
+      // The session's best of this movement — one candidate per session, so a
+      // 5x5 that beats history reads as one new best, not five.
+      let candidate = null;
+      let candidateScore = 0;
+      for (const s of ex.sets || []) {
+        const conv = setIn(s, unit);
+        const score = est1RM(conv.weight, conv.reps);
+        if (score > candidateScore) {
+          candidateScore = score;
+          candidate = { weight: toNum(s.weight), reps: toNum(s.reps), unit: unitOf(s.unit) };
+        }
+      }
+      if (candidate && candidateScore > rec.est) {
+        if (rec.est > 0) {
+          prs.push({ name: rec.name, best: candidate, est: candidateScore, date: w.date, workoutId: w.id });
+        }
+        rec.est = candidateScore;
+        rec.best = candidate;
+        rec.date = w.date;
+      }
+    }
+  }
+
+  const records = [...byKey.values()].sort((a, b) => {
+    if (a.est !== b.est) return b.est - a.est;
+    return a.lastDate < b.lastDate ? 1 : a.lastDate > b.lastDate ? -1 : 0;
+  });
+  return { records, prs: prs.reverse() };
 }
 
 /** Sync transform: reconcile our local month file with the remote copy. */

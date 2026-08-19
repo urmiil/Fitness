@@ -11,6 +11,7 @@ import {
   refreshWorkoutMonths,
   refreshSettings,
   refreshExercises,
+  refreshManifest,
 } from "./sync.js";
 import { todayLocalISO, monthOf, prevMonthOf } from "./dates.js";
 import { showToast } from "./dom.js";
@@ -130,6 +131,9 @@ const months = [monthOf(todayLocalISO())];
 months.push(prevMonthOf(months[0]));
 refreshSettings();
 refreshExercises();
+// The manifest is the index history views pull older months through
+// (sync.js#ensureHistory), so it has to be fresh on this machine too.
+refreshManifest();
 refreshWeightMonths(months);
 refreshNutritionMonths(months);
 refreshWorkoutMonths(months);
