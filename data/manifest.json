@@ -1,7 +1,9 @@
 {
   "schemaVersion": 1,
   "months": {
-    "weight": [],
+    "weight": [
+      "2026-08"
+    ],
     "nutrition": [],
     "workouts": []
   }
