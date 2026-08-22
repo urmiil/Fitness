@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "month": "2026-08",
+  "workouts": [
+    {
+      "id": "wk_0mt4rpjbmd3f5277c2ee2",
+      "date": "2026-08-22",
+      "name": "Push",
+      "note": "",
+      "exercises": [
+        {
+          "id": "ex_0mt4rpt5n4b6c619bf919",
+          "name": "Dumbbell Incline Press",
+          "sets": [
+            {
+              "weight": 60,
+              "reps": 6,
+              "unit": "lb",
+              "rpe": 9
+            },
+            {
+              "weight": 60,
+              "reps": 5,
+              "unit": "lb",
+              "rpe": 9
+            }
+          ]
+        },
+        {
+          "id": "ex_0mt4rr9ey583f1406643f",
+          "name": "Dumbbell Shoulder Press",
+          "sets": [
+            {
+              "weight": 45,
+              "reps": 9,
+              "unit": "lb",
+              "rpe": 9
+            },
+            {
+              "weight": 47.5,
+              "reps": 7,
+              "unit": "lb",
+              "rpe": 10
+            }
+          ]
+        },
+        {
+          "id": "ex_0mt4rscxs3d0a14456a00",
+          "name": "Dips",
+          "sets": [
+            {
+              "weight": 22.5,
+              "reps": 8,
+              "unit": "lb",
+              "rpe": 10
+            },
+            {
+              "weight": 22.5,
+              "reps": 7,
+              "unit": "lb",
+              "rpe": 10
+            },
+            {
+              "weight": 22.5,
+              "reps": 5,
+              "unit": "lb",
+              "rpe": 10
+            }
+          ]
+        },
+        {
+          "id": "ex_0mt4rtiqx63dd40bfcf57",
+          "name": "Chest Fly",
+          "sets": [
+            {
+              "weight": 145,
+              "reps": 8,
+              "unit": "lb",
+              "rpe": 10
+            },
+            {
+              "weight": 145,
+              "reps": 7,
+              "unit": "lb",
+              "rpe": 10
+            }
+          ]
+        },
+        {
+          "id": "ex_0mt4rukyg28b8c35e203c",
+          "name": "Single-Arm Triceps Pushdown",
+          "sets": [
+            {
+              "weight": 25,
+              "reps": 9,
+              "unit": "lb",
+              "rpe": 10
+            },
+            {
+              "weight": 30,
+              "reps": 5,
+              "unit": "lb",
+              "rpe": 10
+            }
+          ]
+        },
+        {
+          "id": "ex_0mt4rv9go105a84441225",
+          "name": "Lateral Raise",
+          "sets": [
+            {
+              "weight": 15,
+              "reps": 5,
+              "unit": "lb",
+              "rpe": 10
+            },
+            {
+              "weight": 15,
+              "reps": 5,
+              "unit": "lb"
+            }
+          ]
+        }
+      ],
+      "updatedAt": "2026-08-22T19:29:43.971Z"
+    }
+  ]
+}
