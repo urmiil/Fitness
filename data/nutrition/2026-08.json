@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "month": "2026-08",
+  "days": [
+    {
+      "date": "2026-08-22",
+      "entries": [
+        {
+          "id": "fd_0mt4siv8u31085fc213e8",
+          "name": "Chia seed, Banana, Blueberry, Dates, Honey Smoothie",
+          "meal": "breakfast",
+          "calories": 541,
+          "protein": 8.5,
+          "carbs": 112,
+          "fat": 9.1,
+          "updatedAt": "2026-08-22T19:47:52.110Z"
+        },
+        {
+          "id": "fd_0mt4sn2ej299d892b7dff",
+          "name": "Broiled Basa",
+          "meal": "lunch",
+          "calories": 75,
+          "protein": 15,
+          "carbs": 0,
+          "fat": 1.2,
+          "updatedAt": "2026-08-22T19:51:08.011Z"
+        },
+        {
+          "id": "fd_0mt4soekw8b73234017e5",
+          "name": "Brussel Sprouts",
+          "meal": "lunch",
+          "calories": 56,
+          "protein": 4,
+          "carbs": 11,
+          "fat": 0.8,
+          "updatedAt": "2026-08-22T19:52:10.448Z"
+        },
+        {
+          "id": "fd_0mt4spiq476ab5783340a",
+          "name": "2 cups boiled broccoli",
+          "meal": "lunch",
+          "calories": 110,
+          "protein": 7.4,
+          "carbs": 22,
+          "fat": 0.6,
+          "updatedAt": "2026-08-22T19:53:02.476Z"
+        },
+        {
+          "id": "fd_0mt4ssjsie97884e416ce",
+          "name": "Soya Chunks",
+          "meal": "lunch",
+          "calories": 105,
+          "protein": 14,
+          "carbs": 9,
+          "fat": 0.3,
+          "updatedAt": "2026-08-22T19:55:23.826Z"
+        },
+        {
+          "id": "fd_0mt4sv5zt08d3d799f809",
+          "name": "1.5 cup cooked brown rice",
+          "meal": "lunch",
+          "calories": 325,
+          "protein": 7.5,
+          "carbs": 67.2,
+          "fat": 2.6,
+          "updatedAt": "2026-08-22T19:57:25.913Z"
+        },
+        {
+          "id": "fd_0mt4sx52u62cc441a496b",
+          "name": "yellow dal",
+          "meal": "lunch",
+          "calories": 230,
+          "protein": 12,
+          "carbs": 35,
+          "fat": 5,
+          "updatedAt": "2026-08-22T19:58:58.038Z"
+        },
+        {
+          "id": "fd_0mt4sy0va88d901b9e3bf",
+          "name": "buttermilk",
+          "meal": "snack",
+          "calories": 100,
+          "protein": 8,
+          "carbs": 12,
+          "fat": 3,
+          "updatedAt": "2026-08-22T19:59:39.238Z"
+        }
+      ]
+    }
+  ]
+}
