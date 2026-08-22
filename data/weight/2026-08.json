@@ -17,6 +17,30 @@
       "unit": "lb",
       "note": "",
       "updatedAt": "2026-08-19T14:12:19.364Z"
+    },
+    {
+      "id": "wt_0mt4rnqq5132de93a9998",
+      "date": "2026-08-20",
+      "weight": 152.7,
+      "unit": "lb",
+      "note": "",
+      "updatedAt": "2026-08-22T19:23:40.224Z"
+    },
+    {
+      "id": "wt_0mt4ro4wab8b8cd197dac",
+      "date": "2026-08-21",
+      "weight": 153.7,
+      "unit": "lb",
+      "note": "",
+      "updatedAt": "2026-08-22T19:23:58.282Z"
+    },
+    {
+      "id": "wt_0mt4ro9gpcf7d0cc4071c",
+      "date": "2026-08-22",
+      "weight": 151.7,
+      "unit": "lb",
+      "note": "",
+      "updatedAt": "2026-08-22T19:24:07.884Z"
     }
   ]
 }
